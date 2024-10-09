@@ -1,0 +1,360 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Warehouse Management System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        form, div {
+            margin-bottom: 20px;
+        }
+        input, button, select {
+            margin: 5px 0;
+            padding: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .low-stock {
+            background-color: #ffcccc;
+        }
+        .medium-stock {
+            background-color: #ffffcc;
+        }
+        .high-stock {
+            background-color: #ccffcc;
+        }
+        #lowStockAlert {
+            background-color: #ff9999;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Restaurant Warehouse Management System</h1>
+        
+        <div id="lowStockAlert"></div>
+        
+        <h2>Add Item</h2>
+        <form id="addItemForm">
+            <select id="itemType">
+                <option value="food">Food</option>
+                <option value="supplies">Supplies</option>
+                <option value="softDrinks">Soft Drinks</option>
+            </select>
+            <input type="text" id="addItemName" placeholder="Item Name" required>
+            <input type="number" id="addItemQuantity" placeholder="Quantity" required min="1">
+            <button type="submit">Add Item</button>
+        </form>
+        
+        <h2>Remove Item</h2>
+        <form id="removeItemForm">
+            <select id="removeItemType">
+                <option value="food">Food</option>
+                <option value="supplies">Supplies</option>
+                <option value="softDrinks">Soft Drinks</option>
+            </select>
+            <input type="text" id="removeItemName" placeholder="Item Name" required>
+            <input type="number" id="removeItemQuantity" placeholder="Quantity" required min="1">
+            <button type="submit">Remove Item</button>
+        </form>
+        
+        <h2>Current Food Inventory</h2>
+        <input type="text" id="searchFoodItem" placeholder="Search food items">
+        <table id="foodInventoryTable">
+            <thead>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Quantity</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Food inventory items will be added here dynamically -->
+            </tbody>
+        </table>
+        
+        <h2>Current Supplies Inventory</h2>
+        <input type="text" id="searchSuppliesItem" placeholder="Search supplies items">
+        <table id="suppliesInventoryTable">
+            <thead>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Quantity</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Supplies inventory items will be added here dynamically -->
+            </tbody>
+        </table>
+
+        <h2>Current Soft Drinks Inventory</h2>
+        <input type="text" id="searchSoftDrinksItem" placeholder="Search soft drinks">
+        <table id="softDrinksInventoryTable">
+            <thead>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Quantity</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Soft drinks inventory items will be added here dynamically -->
+            </tbody>
+        </table>
+
+        <h2>Inventory History</h2>
+        <div>
+            <input type="text" id="searchHistory" placeholder="Search history">
+            <select id="historyPeriod">
+                <option value="1">Yesterday</option>
+                <option value="7">1 Week Ago</option>
+                <option value="14">2 Weeks Ago</option>
+                <option value="30">30 Days Ago</option>
+            </select>
+            <button id="clearHistoryBtn">Clear Selected</button>
+        </div>
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="selectAllHistory"></th>
+                    <th>Date</th>
+                    <th>Item Type</th>
+                    <th>Item Name</th>
+                    <th>Quantity Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- History items will be added here dynamically -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Initialize inventories and history
+        let foodInventory = JSON.parse(localStorage.getItem('foodInventory')) || {};
+        let suppliesInventory = JSON.parse(localStorage.getItem('suppliesInventory')) || {};
+        let softDrinksInventory = JSON.parse(localStorage.getItem('softDrinksInventory')) || {};
+        let history = JSON.parse(localStorage.getItem('history')) || [];
+
+        // Function to update local storage
+        function updateStorage() {
+            localStorage.setItem('foodInventory', JSON.stringify(foodInventory));
+            localStorage.setItem('suppliesInventory', JSON.stringify(suppliesInventory));
+            localStorage.setItem('softDrinksInventory', JSON.stringify(softDrinksInventory));
+            localStorage.setItem('history', JSON.stringify(history));
+        }
+
+        // Function to add or update an item
+        function addItem(type, name, quantity) {
+            quantity = parseInt(quantity);
+            let inventory = (type === 'food') ? foodInventory 
+                         : (type === 'supplies') ? suppliesInventory 
+                         : softDrinksInventory;
+            if (inventory[name]) {
+                inventory[name] += quantity;
+            } else {
+                inventory[name] = quantity;
+            }
+            history.push({date: new Date().toISOString(), type: type, item: name, change: quantity});
+            updateStorage();
+            updateInventoryTables();
+            updateHistoryTable();
+            checkLowStock();
+        }
+
+        // Function to remove an item
+        function removeItem(type, name, quantity) {
+            quantity = parseInt(quantity);
+            let inventory = (type === 'food') ? foodInventory 
+                         : (type === 'supplies') ? suppliesInventory 
+                         : softDrinksInventory;
+            if (inventory[name]) {
+                if (inventory[name] >= quantity) {
+                    inventory[name] -= quantity;
+                    history.push({date: new Date().toISOString(), type: type, item: name, change: -quantity});
+                    if (inventory[name] === 0) {
+                        delete inventory[name];
+                    }
+                    updateStorage();
+                    updateInventoryTables();
+                    updateHistoryTable();
+                    checkLowStock();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Function to update inventory tables
+        function updateInventoryTables() {
+            updateInventoryTable('food', foodInventory, 'foodInventoryTable');
+            updateInventoryTable('supplies', suppliesInventory, 'suppliesInventoryTable');
+            updateInventoryTable('softDrinks', softDrinksInventory, 'softDrinksInventoryTable');
+        }
+
+        // Function to update a single inventory table
+        function updateInventoryTable(type, inventory, tableId) {
+            const tbody = document.querySelector(`#${tableId} tbody`);
+            tbody.innerHTML = '';
+            for (const [name, quantity] of Object.entries(inventory)) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${name}</td>
+                    <td>${quantity}</td>
+                `;
+                if (quantity <= 5) {
+                    tr.classList.add('low-stock');
+                } else if (quantity <= 10) {
+                    tr.classList.add('medium-stock');
+                } else {
+                    tr.classList.add('high-stock');
+                }
+                tbody.appendChild(tr);
+            }
+        }
+
+        // Function to update history table
+        function updateHistoryTable() {
+            const period = document.getElementById('historyPeriod').value;
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - period);
+
+            const tbody = document.querySelector('#historyTable tbody');
+            tbody.innerHTML = '';
+            for (const entry of history) {
+                const entryDate = new Date(entry.date);
+                if (entryDate >= cutoffDate) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><input type="checkbox" class="historySelect"></td>
+                        <td>${entryDate.toLocaleDateString()}</td>
+                        <td>${entry.type}</td>
+                        <td>${entry.item}</td>
+                        <td>${entry.change}</td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            }
+        }
+
+        // Function to check for low stock
+        function checkLowStock() {
+            let lowStockItems = [];
+            const allInventories = {...foodInventory, ...suppliesInventory, ...softDrinksInventory};
+            for (const [name, quantity] of Object.entries(allInventories)) {
+                if (quantity <= 5) {
+                    lowStockItems.push(name);
+                }
+            }
+            const alertDiv = document.getElementById('lowStockAlert');
+            if (lowStockItems.length > 0) {
+                alertDiv.innerHTML = `Low stock alert: ${lowStockItems.join(', ')}`;
+                alertDiv.style.display = 'block';
+            } else {
+                alertDiv.style.display = 'none';
+            }
+        }
+
+        // Event listeners for adding and removing items
+        document.getElementById('addItemForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const type = document.getElementById('itemType').value;
+            const name = document.getElementById('addItemName').value.trim();
+            const quantity = document.getElementById('addItemQuantity').value;
+            addItem(type, name, quantity);
+            this.reset();  // Clear form after submission
+        });
+
+        document.getElementById('removeItemForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const type = document.getElementById('removeItemType').value;
+            const name = document.getElementById('removeItemName').value.trim();
+            const quantity = document.getElementById('removeItemQuantity').value;
+            if (removeItem(type, name, quantity)) {
+                this.reset();  // Clear form after successful submission
+            } else {
+                alert('Error: Item does not exist or insufficient quantity.');
+            }
+        });
+
+        // Event listeners for search fields
+        document.getElementById('searchFoodItem').addEventListener('input', function() {
+            searchInventory('foodInventoryTable', this.value);
+        });
+        document.getElementById('searchSuppliesItem').addEventListener('input', function() {
+            searchInventory('suppliesInventoryTable', this.value);
+        });
+        document.getElementById('searchSoftDrinksItem').addEventListener('input', function() {
+            searchInventory('softDrinksInventoryTable', this.value);
+        });
+        document.getElementById('searchHistory').addEventListener('input', function() {
+            searchHistory(this.value);
+        });
+
+        // Search functions
+        function searchInventory(tableId, query) {
+            const rows = document.querySelectorAll(`#${tableId} tbody tr`);
+            rows.forEach(row => {
+                const itemName = row.cells[0].textContent.toLowerCase();
+                if (itemName.includes(query.toLowerCase())) {
+                    row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+        }
+
+        function searchHistory(query) {
+            const rows = document.querySelectorAll('#historyTable tbody tr');
+            rows.forEach(row => {
+                const itemType = row.cells[2].textContent.toLowerCase();
+                const itemName = row.cells[3].textContent.toLowerCase();
+                if (itemType.includes(query.toLowerCase()) || itemName.includes(query.toLowerCase())) {
+                    row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+        }
+
+        // Initialize table data on page load
+        updateInventoryTables();
+        updateHistoryTable();
+        checkLowStock();
+        fetch('package.json')
+        fetch('vercel.json')
+
+    </script>
+</body>
+</html>
+
+
